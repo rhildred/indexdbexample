@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+        <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+        <script>
+            angular.module("myApp", []).controller("myCtrl", function ($scope, $http) 
+            {
+                
+                var dbSize = 5 * 1024 * 1024; // 5MB
+                $scope.webdb = {};
+                $scope.webdb.onError = function(tx, e) {
+                    alert("There has been an error: " + e.message);
+                }
+                $scope.webdb.onSuccess = function(tx, r) {
+                    // re-render the data.
+                    // loadTodoItems is defined in Step 4a
+                    $scope.webdb.getAllTodoItems($scope.loadTodoItems);
+                }
+                $scope.addTask = function(){
+                    //alert("adding task " + $scope.task.currentTask);
+                    //$scope.tasks.push({description:$scope.task.currentTask});
+                    $scope.webdb.addTodo($scope.task.currentTask);
+                    $scope.task.currentTask = "";
+                }
+                $scope.webdb.createTable = function() {
+                    var db = $scope.webdb.db;
+                    db.transaction(function(tx) {
+                        tx.executeSql("CREATE TABLE IF NOT EXISTS " +
+                                    "todo(ID INTEGER PRIMARY KEY ASC, todo TEXT, added_on DATETIME)", []);
+                    });
+                }
+                $scope.webdb.addTodo = function(todoText) {
+                    var db = $scope.webdb.db;
+                    db.transaction(function(tx){
+                        var addedOn = new Date();
+                        tx.executeSql("INSERT INTO todo(todo, added_on) VALUES (?,?)",
+                            [todoText, addedOn],
+                            $scope.webdb.onSuccess,
+                            $scope.webdb.onError);
+                    });
+                }
+                $scope.webdb.getAllTodoItems = function(renderFunc) {
+                    $scope.tasks = [];
+                    var db = $scope.webdb.db;
+                    db.transaction(function(tx) {
+                        tx.executeSql("SELECT * FROM todo", [], renderFunc,
+                            $scope.webdb.onError);
+                    });
+                }
+                $scope.loadTodoItems = function(tx, rs){
+                    for (var i=0; i < rs.rows.length; i++) {
+                        $scope.tasks.push({description:rs.rows.item(i).todo});
+                    }
+                    $scope.$apply();
+                }
+                $scope.webdb.db = openDatabase("Todo", "1", "Todo manager", dbSize);
+                $scope.webdb.createTable();
+                $scope.webdb.getAllTodoItems($scope.loadTodoItems);
+
+            });
+        </script>
+    </head>
+    <body>
+        <div ng-app="myApp" ng-controller="myCtrl">
+            <div ng-repeat="(n, listTask) in tasks track by n">{{listTask.description}} <button ng-click="finishTask(listTask.id)">Finish</button><button ng-click="deleteTask(listTask.id)">Delete</button></div>
+            <form><p>New Task : <input type="text" ng-model="task.currentTask"></p>
+                <button type = "submit" ng-click="addTask()">Add</button>
+            </form>
+        </div>
+
+    </body>
+</html>
