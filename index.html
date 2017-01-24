@@ -26,7 +26,7 @@
                     var db = $scope.webdb.db;
                     db.transaction(function(tx) {
                         tx.executeSql("CREATE TABLE IF NOT EXISTS " +
-                                    "todo(ID INTEGER PRIMARY KEY ASC, todo TEXT, added_on DATETIME)", []);
+                                    "todo(ID INTEGER PRIMARY KEY ASC, todo TEXT, added_on DATETIME, finished_on DATETIME)", []);
                     });
                 }
                 $scope.webdb.addTodo = function(todoText) {
@@ -49,9 +49,31 @@
                 }
                 $scope.loadTodoItems = function(tx, rs){
                     for (var i=0; i < rs.rows.length; i++) {
-                        $scope.tasks.push({description:rs.rows.item(i).todo});
+                        $scope.tasks.push({description:rs.rows.item(i).todo, 
+                        id:rs.rows.item(i).ID,
+                        start:rs.rows.item(i).added_on,
+                        finished:rs.rows.item(i).finished_on});
                     }
                     $scope.$apply();
+                }
+                $scope.finishTask = function(nId){
+                    var db = $scope.webdb.db;
+                    db.transaction(function(tx){
+                        var finishedOn = new Date();
+                        tx.executeSql("UPDATE todo SET finished_on = ? WHERE ID = ?",
+                            [finishedOn, nId],
+                            $scope.webdb.onSuccess,
+                            $scope.webdb.onError);
+                    });
+                }
+                $scope.deleteTask = function(nId){
+                    var db = $scope.webdb.db;
+                    db.transaction(function(tx){
+                        tx.executeSql("DELETE FROM todo WHERE ID = ?",
+                            [nId],
+                            $scope.webdb.onSuccess,
+                            $scope.webdb.onError);
+                    });
                 }
                 $scope.webdb.db = openDatabase("Todo", "1", "Todo manager", dbSize);
                 $scope.webdb.createTable();
@@ -62,7 +84,9 @@
     </head>
     <body>
         <div ng-app="myApp" ng-controller="myCtrl">
-            <div ng-repeat="(n, listTask) in tasks track by n">{{listTask.description}} <button ng-click="finishTask(listTask.id)">Finish</button><button ng-click="deleteTask(listTask.id)">Delete</button></div>
+            <div ng-repeat="(n, listTask) in tasks track by n">{{listTask.description}},
+                {{listTask.start}}, {{listTask.finished}}
+                 <button ng-click="finishTask(listTask.id)">Finish</button><button ng-click="deleteTask(listTask.id)">Delete</button></div>
             <form><p>New Task : <input type="text" ng-model="task.currentTask"></p>
                 <button type = "submit" ng-click="addTask()">Add</button>
             </form>
