@@ -4,10 +4,11 @@
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
         <script src="https://www.gstatic.com/firebasejs/3.6.2/firebase.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/angularFire/2.2.0/angularfire.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.7/uuid.js"></script>
         <script>
             angular.module("myApp", []).controller("myCtrl", function ($scope, $http) 
             {
-                
+                console.log("uid: " + uuid.v4());
                 var dbSize = 5 * 1024 * 1024; // 5MB
                 $scope.webdb = {};
                 $scope.webdb.onError = function(tx, e) {
