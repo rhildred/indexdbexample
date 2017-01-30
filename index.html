@@ -1,55 +1,64 @@
 <!DOCTYPE html>
 <html lang="en-US">
-    <head>
-        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
-        <script src="https://cdn.firebase.com/js/client/2.2.1/firebase.js"></script>
-        <script src="https://cdn.firebase.com/libs/angularfire/1.0.0/angularfire.min.js"></script>
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.7/uuid.js"></script>
-        <script>
-            angular.module("myApp", ["firebase"]).controller("myCtrl", function ($scope, $http, $firebaseArray) 
-            {
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.js"></script>
+    <script src="https://cdn.firebase.com/js/client/2.2.1/firebase.js"></script>
+    <script src="https://cdn.firebase.com/libs/angularfire/1.0.0/angularfire.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.7/uuid.js"></script>
+    <script>
+            angular.module("myApp", ["firebase"]).controller("myCtrl", function ($scope, $http, $firebaseArray) {
                 console.log("uid: " + uuid.v4());
                 var dbSize = 5 * 1024 * 1024; // 5MB
                 $scope.webdb = {};
-                $scope.webdb.onError = function(tx, e) {
+                $scope.webdb.onError = function (tx, e) {
                     alert("There has been an error: " + e.message);
                 }
-                $scope.webdb.onSuccess = function(tx, r) {
+                $scope.webdb.onSuccess = function (tx, r) {
                     // re-render the data.
                     // loadTodoItems is defined in Step 4a
                     $scope.webdb.getAllTodoItems($scope.loadTodoItems);
                 }
-                $scope.addTask = function(){
+                $scope.addTask = function () {
                     //alert("adding task " + $scope.task.currentTask);
                     //$scope.tasks.push({description:$scope.task.currentTask});
                     $scope.webdb.addTodo($scope.task.currentTask);
                     $scope.task.currentTask = "";
                 }
-                $scope.webdb.createTaskTable = function() {
+                $scope.webdb.createTaskTable = function () {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx) {
+                    db.transaction(function (tx) {
                         tx.executeSql("CREATE TABLE IF NOT EXISTS " +
-                                    "todo(ID TEXT PRIMARY KEY, todo TEXT, added_on DATETIME, finished_on DATETIME)", []);
+                            "todo(ID TEXT PRIMARY KEY, todo TEXT, added_on DATETIME, finished_on DATETIME)", []);
                     });
                 }
-                $scope.webdb.createIDTable = function() {
+                $scope.webdb.createIDTable = function () {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx) {
+                    db.transaction(function (tx) {
                         tx.executeSql("SELECT uid FROM table_id", [],
                             $scope.webdb.onID,
                             $scope.webdb.onNoID
                         );
                     });
                 }
-                $scope.webdb.onID =function(tx, rs){
+                $scope.webdb.onID = function (tx, rs) {
                     $scope.ID = rs.rows[0].uid;
-                    $scope.ref = new Firebase("https://dazzling-heat-1553.firebaseio.com/tasks/" + $scope.id);
+                    $scope.ref = new Firebase("https://dazzling-heat-1553.firebaseio.com/tasks/" + $scope.ID + "/");
                     $scope.firebasemessages = $firebaseArray($scope.ref);
+                    $scope.firebasemessages.$loaded()
+                        .then(function (x) {
+                            $scope.webdb.getAllTodoItems($scope.loadTodoItems);
+                        })
+                        .catch(function (error) {
+                            $scope.webdb.getAllTodoItems($scope.loadTodoItems);
+                            console.log("Working offline " + error)
+                        });
+
                 }
-                $scope.webdb.onNoID = function(){
+                $scope.webdb.onNoID = function () {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx) {
+                    db.transaction(function (tx) {
                         tx.executeSql("CREATE TABLE IF NOT EXISTS table_id(uid TEXT PRIMARY KEY)", [],
                             $scope.webdb.onInsertID,
                             $scope.webdb.onError
@@ -57,20 +66,20 @@
                     });
                 }
 
-                $scope.webdb.onInsertID = function(){
+                $scope.webdb.onInsertID = function () {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx) {
+                    db.transaction(function (tx) {
                         tx.executeSql("INSERT INTO table_id (uid) VALUES(?)", [uuid.v4()],
                             $scope.webdb.createIDTable,
                             $scope.webdb.onError
                         );
                     });
-                    
+
                 }
 
-                $scope.webdb.addTodo = function(todoText) {
+                $scope.webdb.addTodo = function (todoText) {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx){
+                    db.transaction(function (tx) {
                         var addedOn = new Date();
                         tx.executeSql("INSERT INTO todo(ID, todo, added_on) VALUES (?,?,?)",
                             [uuid.v4(), todoText, addedOn],
@@ -78,31 +87,32 @@
                             $scope.webdb.onError);
                     });
                 }
-                $scope.webdb.getAllTodoItems = function(renderFunc) {
+                $scope.webdb.getAllTodoItems = function (renderFunc) {
                     $scope.tasks = [];
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx) {
+                    db.transaction(function (tx) {
                         tx.executeSql("SELECT * FROM todo ORDER BY added_on", [], renderFunc,
                             $scope.webdb.onError);
                     });
                 }
-                $scope.loadTodoItems = function(tx, rs){
+                $scope.loadTodoItems = function (tx, rs) {
                     //load items and sync
-                    var firebaseMessages = $scope.firebasemessages;
-                    for (var i=0; i < rs.rows.length; i++) {
-                        $scope.tasks.push({description:rs.rows.item(i).todo, 
-                        id:rs.rows.item(i).ID,
-                        start:rs.rows.item(i).added_on,
-                        finished:rs.rows.item(i).finished_on});
-                        if(firebaseMessages.length < i + 1){
-                            firebaseMessages.push($scope.tasks[i]);
+                    for (var i = 0; i < rs.rows.length; i++) {
+                        $scope.tasks.push({
+                            description: rs.rows.item(i).todo,
+                            id: rs.rows.item(i).ID,
+                            start: rs.rows.item(i).added_on,
+                            finished: rs.rows.item(i).finished_on
+                        });
+                        if ($scope.firebasemessages.length < i + 1) {
+                            $scope.firebasemessages.$add($scope.tasks[i]);
                         }
                     }
                     $scope.$apply();
                 }
-                $scope.finishTask = function(nId){
+                $scope.finishTask = function (nId) {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx){
+                    db.transaction(function (tx) {
                         var finishedOn = new Date();
                         tx.executeSql("UPDATE todo SET finished_on = ? WHERE ID = ?",
                             [finishedOn, nId],
@@ -110,9 +120,9 @@
                             $scope.webdb.onError);
                     });
                 }
-                $scope.deleteTask = function(nId){
+                $scope.deleteTask = function (nId) {
                     var db = $scope.webdb.db;
-                    db.transaction(function(tx){
+                    db.transaction(function (tx) {
                         tx.executeSql("DELETE FROM todo WHERE ID = ?",
                             [nId],
                             $scope.webdb.onSuccess,
@@ -122,20 +132,21 @@
                 $scope.webdb.db = openDatabase("Todo", "1", "Todo manager", dbSize);
                 $scope.webdb.createTaskTable();
                 $scope.webdb.createIDTable();
-                $scope.webdb.getAllTodoItems($scope.loadTodoItems);
 
             });
         </script>
-    </head>
-    <body>
-        <div ng-app="myApp" ng-controller="myCtrl">
-            <div ng-repeat="(n, listTask) in tasks track by n">{{listTask.description}},
-                {{listTask.start}}, {{listTask.finished}}
-                 <button ng-click="finishTask(listTask.id)">Finish</button><button ng-click="deleteTask(listTask.id)">Delete</button></div>
-            <form><p>New Task : <input type="text" ng-model="task.currentTask"></p>
-                <button type = "submit" ng-click="addTask()">Add</button>
-            </form>
-        </div>
+</head>
 
-    </body>
+<body>
+    <div ng-app="myApp" ng-controller="myCtrl">
+        <div ng-repeat="(n, listTask) in tasks track by n">{{listTask.description}}, {{listTask.start}}, {{listTask.finished}}
+            <button ng-click="finishTask(listTask.id)">Finish</button><button ng-click="deleteTask(listTask.id)">Delete</button></div>
+        <form>
+            <p>New Task : <input type="text" ng-model="task.currentTask"></p>
+            <button type="submit" ng-click="addTask()">Add</button>
+        </form>
+    </div>
+
+</body>
+
 </html>
